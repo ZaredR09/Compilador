@@ -28,6 +28,11 @@ namespace Cplusplus
 			match("<");
 			match(Tipos.Identificador);
 			match(">");
+			if (Contenido == "#")
+			{
+				match("#");
+				Librerias();
+			}
 		}
 		public void Main()
 		{
@@ -39,10 +44,6 @@ namespace Cplusplus
 		}
 		public void BloqueInstrucciones()
 		{
-		}
-		public void Variables()
-		{
-			match(Tipos.Identificador);
 		}
 	}
 }
