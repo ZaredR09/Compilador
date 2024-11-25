@@ -11,9 +11,8 @@ namespace Compilador
         {
             try
             {
-                using (Lenguaje L = new Lenguaje("Gramatica.txt"))
-                {    
-                    
+                using (Lenguaje L = new Lenguaje(@"c:\ITQRepos\Compilador\Gramatica.txt"))
+                {
                     /*
                     while (!L.finArchivo())
                     {
