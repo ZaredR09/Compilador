@@ -24,6 +24,8 @@ namespace Compilador
     {
         // Tal vez necesite una pila para almacenar las opcionales y el or
         private int IndentCont;
+        // Me guardo el primer token en la bolsa, sin importar que sea pero debe ser global para todos dentro de una produccion
+        TokensOpt firstOPT = new();
         public Lenguaje()
         {
             IndentCont = 0;
@@ -82,6 +84,7 @@ namespace Compilador
         }
         private void Producciones()
         {
+            bool doOnce = true;
             if (Clasificacion == Tipos.SNT)
             {
                 lenguajecs.WriteLine(IndentString() + "public void " + Contenido + "()");
@@ -90,7 +93,8 @@ namespace Compilador
             }
             match(Tipos.SNT);
             match(Tipos.Flecha);
-            ConjuntoTokens();
+            // Me conviene guardar todo el contenido y imprimir al final, o bien hacer la lista de todo y imprimir la misma lista al final, con todo y lo de las recursividades
+            ConjuntoTokens(doOnce);
             match(Tipos.FinProduccion);
             IndentCont--;
             lenguajecs.WriteLine(IndentString() + "}");
@@ -99,21 +103,36 @@ namespace Compilador
                 Producciones();
             }
         }
-        private void ConjuntoTokens()
+        private void ConjuntoTokens(bool doOnce)
         {
             // Inicial
             if (Clasificacion == Tipos.SNT)
             {
+                if(doOnce)
+                {
+                    firstOPT = new TokensOpt(Clasificacion, Contenido);
+                    doOnce = false;
+                }
                 lenguajecs.WriteLine(IndentString() + Contenido + "();");
                 match(Tipos.SNT);
             }
             else if (Clasificacion == Tipos.ST)
             {
+                if(doOnce)
+                {
+                    firstOPT = new TokensOpt(Clasificacion, Contenido);
+                    doOnce = false;
+                }
                 lenguajecs.WriteLine(IndentString() + "match(\"" + Contenido + "\");");
                 match(Tipos.ST);
             }
             else if (Clasificacion == Tipos.Tipo)
             {
+                if(doOnce)
+                {
+                    firstOPT = new TokensOpt(Clasificacion, Contenido);
+                    doOnce = false;
+                }
                 lenguajecs.WriteLine(IndentString() + "match(Tipos." + Contenido + ");");
                 match(Tipos.Tipo);
             }
@@ -125,55 +144,82 @@ namespace Compilador
             */
             else if (Clasificacion == Tipos.PIzquierdo)
             {
-                // guardo la posicion para regresar, ahora no se si sea necesario regresar
-                List<TokensOpt> Cola = new List<TokensOpt>();
-                match(Tipos.PIzquierdo);
-                log.WriteLine("------ Almacenaje de tokens en parentesis ------");
-                while(Clasificacion != Tipos.PDerecho)
+                // La lista compartida estaria aqui, todo se imprimiria a posteriori y lo que empieza acaba aqui
+                conjuntoDelParentesis();
+                // la impresion viene hasta el primer parentesis izquiero y despues
+                // empieza la siguiente hasta el derecho, la parte inicial se separa del cuerpo
+                // que dentro puede tener otro cuerpo
+            }
+            else if(Clasificacion != Tipos.FinProduccion) throw new Error("TIPO NO PERMITIDO", log, linea);
+            if (Clasificacion != Tipos.FinProduccion)
+            {
+                ConjuntoTokens(doOnce);
+            }
+        }
+        // Pasar la cola de tokens para imprimir en orden, tal vez use un "servicio de impresion"
+        private void conjuntoDelParentesis()
+        {
+            // Podria almacenar todo en la misma cola, pero los parentesis crearian algunos conflictos, habria que probar posibilidades
+            List<TokensOpt> Cola = new List<TokensOpt>();
+            match(Tipos.PIzquierdo);
+            log.WriteLine("------ Almacenaje de tokens en parentesis ------");
+            while(Clasificacion != Tipos.PDerecho)
+            {
+                if(Clasificacion == Tipos.ST)
                 {
-                    if(Clasificacion == Tipos.ST)
-                    {
-                        Cola.Add(new TokensOpt(Clasificacion, Contenido));
-                        match(Tipos.ST);
-                    }
-                    else if(Clasificacion == Tipos.SNT)
-                    {
-                        Cola.Add(new TokensOpt(Clasificacion, Contenido));
-                        match(Tipos.SNT);
-                    }
-                    else if(Clasificacion == Tipos.Tipo)
-                    {
-                        Cola.Add(new TokensOpt(Clasificacion, Contenido));
-                        match(Tipos.Tipo);
-                    }
-                    else if(Clasificacion == Tipos.Or)
-                    {
-                        Cola.Add(new TokensOpt(Clasificacion));
-                        match(Tipos.Or);
-                    }
+                    Cola.Add(new TokensOpt(Clasificacion, Contenido));
+                    match(Tipos.ST);
                 }
-                log.WriteLine("------ Fin Almacenaje de tokens en parentesis ------");
-                match(Tipos.PDerecho);
-                // Post almacenaje se hacen las comprobaciones y generacion de codigo
-                if(Clasificacion == Tipos.Epsilon)
+                else if(Clasificacion == Tipos.SNT)
                 {
-                    match(Tipos.Epsilon);
-                    if(Cola.Any(x=> x.TClasificacion == Tipos.Or)) throw new Error("No puede haber OR con EPSILON",log,linea);
-                    // Generacion de codigo
+                    Cola.Add(new TokensOpt(Clasificacion, Contenido));
+                    match(Tipos.SNT);
+                }
+                else if(Clasificacion == Tipos.Tipo)
+                {
+                    Cola.Add(new TokensOpt(Clasificacion, Contenido));
+                    match(Tipos.Tipo);
+                }
+                else if(Clasificacion == Tipos.Or)
+                {
+                    Cola.Add(new TokensOpt(Clasificacion));
+                    match(Tipos.Or);
+                }
+                else
+                {
+                    // No permite un parentesis dentro de otro parentesis
+                    // throw new Error("TIPO NO PERMITIDO", log, linea);
+                    // Intentemos hacerlo
+                    conjuntoDelParentesis();
+                }
+            }
+            log.WriteLine("------ Fin Almacenaje de tokens en parentesis ------");
+            match(Tipos.PDerecho);
+            // Post almacenaje se hacen las comprobaciones y generacion de codigo
+            if(Clasificacion == Tipos.Epsilon)
+            {
+                match(Tipos.Epsilon);
+                // Errores
+                if(Cola.Any(x=> x.TClasificacion == Tipos.Or)) throw new Error("No puede haber OR con EPSILON", log, linea);
+                // Generacion de codigo
+                // Cuidado con la condicion de la recursividad
+                if(Cola.First().TClasificacion == Tipos.SNT && firstOPT.TClasificacion == Tipos.SNT) throw new Error("No hay criterio de recursividad de tipo ST Y TIPOS", log, linea);
+                if(Cola.First().TClasificacion != Tipos.SNT)
+                {
                     lenguajecs.Write(IndentString() + "if (");
                     if (Cola.First().TClasificacion == Tipos.ST)
                     {
                         lenguajecs.WriteLine("Contenido == \"" + Cola.First().TContenido + "\")");
                         lenguajecs.WriteLine(IndentString() + "{");
                         IndentCont++;
-                        lenguajecs.WriteLine(IndentString() + "match(\"" + Cola.First().TContenido + "\");");
+                        // lenguajecs.WriteLine(IndentString() + "match(\"" + Cola.First().TContenido + "\");");
                     }
                     else if (Cola.First().TClasificacion == Tipos.Tipo)
                     {
                         lenguajecs.WriteLine("Clasificacion == Tipos." + Cola.First().TContenido + ")");
                         lenguajecs.WriteLine(IndentString() + "{");
                         IndentCont++;
-                        lenguajecs.WriteLine(IndentString() + "match(Tipos." + Cola.First().TContenido + ");");
+                        // lenguajecs.WriteLine(IndentString() + "match(Tipos." + Cola.First().TContenido + ");");
                     }
                     for(int i = 1; i < Cola.Count; i++)
                     {
@@ -193,95 +239,126 @@ namespace Compilador
                     IndentCont--;
                     lenguajecs.WriteLine(IndentString() + "}");
                 }
-                else
+                else if(firstOPT.TClasificacion != Tipos.SNT)
                 {
-                    // Comprobacion de si hay ORs en orden si es que estos existen
-                    if(Cola.Any(x=> x.TClasificacion == Tipos.Or))
+                    lenguajecs.Write(IndentString() + "if (");
+                    if (firstOPT.TClasificacion == Tipos.ST)
                     {
-                        for(int i = 0; i < Cola.Count; i++) if(i % 2 != 0) if(Cola.ToList().ElementAt(i).TClasificacion != Tipos.Or) throw new Error("El OR no esta en orden",log,linea);
-                        // Remuevo los ors
-                        Cola.RemoveAll(x => x.TClasificacion == Tipos.Or);
-                        // Generacion de codigo, primer if
-                        lenguajecs.Write(IndentString() + "if (");
-                        if (Cola.First().TClasificacion == Tipos.ST)
-                        {
-                            lenguajecs.WriteLine("Contenido == \"" + Cola.First().TContenido + "\")");
-                            lenguajecs.WriteLine(IndentString() + "{");
-                            IndentCont++;
-                            lenguajecs.WriteLine(IndentString() + "match(\"" + Cola.First().TContenido + "\");");
-                        }
-                        else if (Cola.First().TClasificacion == Tipos.Tipo)
-                        {
-                            lenguajecs.WriteLine("Clasificacion == Tipos." + Cola.First().TContenido + ")");
-                            lenguajecs.WriteLine(IndentString() + "{");
-                            IndentCont++;
-                            lenguajecs.WriteLine(IndentString() + "match(Tipos." + Cola.First().TContenido + ");");
-                        }
-                        IndentCont--;
-                        lenguajecs.WriteLine(IndentString() + "}");
-                        // Los else if de en medio
-                        for(int i = 1; i < (Cola.Count - 1); i++)
-                        {
-                            lenguajecs.Write(IndentString() + "else if (");
-                            if (Cola.ElementAt(i).TClasificacion == Tipos.ST)
-                            {
-                                lenguajecs.WriteLine("Contenido == \"" + Cola.ElementAt(i).TContenido + "\")");
-                                lenguajecs.WriteLine(IndentString() + "{");
-                                IndentCont++;
-                                lenguajecs.WriteLine(IndentString() + "match(\"" + Cola.ElementAt(i).TContenido + "\");");
-                            }
-                            else if (Cola.ElementAt(i).TClasificacion == Tipos.Tipo)
-                            {
-                                lenguajecs.WriteLine("Clasificacion == Tipos." + Cola.ElementAt(i).TContenido + ")");
-                                lenguajecs.WriteLine(IndentString() + "{");
-                                IndentCont++;
-                                lenguajecs.WriteLine(IndentString() + "match(Tipos." + Cola.ElementAt(i).TContenido + ");");
-                            }
-                            IndentCont--;
-                            lenguajecs.WriteLine(IndentString() + "}");
-                        }
-                        // Ultimo else
-                        lenguajecs.WriteLine(IndentString() + "else");
+                        lenguajecs.WriteLine("Contenido == \"" + firstOPT.TContenido + "\")");
                         lenguajecs.WriteLine(IndentString() + "{");
                         IndentCont++;
-                        if (Cola.Last().TClasificacion == Tipos.SNT)
+                        // lenguajecs.WriteLine(IndentString() + "match(\"" + firstOPT.TContenido + "\");");
+                    }
+                    else if (firstOPT.TClasificacion == Tipos.Tipo)
+                    {
+                        lenguajecs.WriteLine("Clasificacion == Tipos." + firstOPT.TContenido + ")");
+                        lenguajecs.WriteLine(IndentString() + "{");
+                        IndentCont++;
+                        // lenguajecs.WriteLine(IndentString() + "match(Tipos." + firstOPT.TContenido + ");");
+                    }
+                    for(int i = 0; i < Cola.Count; i++)
+                    {
+                        if (Cola.ElementAt(i).TClasificacion == Tipos.SNT)
                         {
-                            lenguajecs.WriteLine(IndentString() + Cola.Last().TContenido + "();");
+                            lenguajecs.WriteLine(IndentString() + Cola.ElementAt(i).TContenido + "();");
                         }
-                        else if (Cola.Last().TClasificacion == Tipos.ST)
+                        else if (Cola.ElementAt(i).TClasificacion == Tipos.ST)
                         {
-                            lenguajecs.WriteLine(IndentString() + "match(\"" + Cola.Last().TContenido + "\");");
+                            lenguajecs.WriteLine(IndentString() + "match(\"" + Cola.ElementAt(i).TContenido + "\");");
                         }
-                        else if (Cola.Last().TClasificacion == Tipos.Tipo)
+                        else if (Cola.ElementAt(i).TClasificacion == Tipos.Tipo)
                         {
-                            lenguajecs.WriteLine(IndentString() + "match(Tipos." + Cola.Last().TContenido + ");");
+                            lenguajecs.WriteLine(IndentString() + "match(Tipos." + Cola.ElementAt(i).TContenido + ");");
+                        }
+                    }
+                    IndentCont--;
+                    lenguajecs.WriteLine(IndentString() + "}");
+                }
+            }
+            else
+            {
+                // Comprobacion de si hay ORs en orden si es que estos existen
+                if(Cola.Any(x=> x.TClasificacion == Tipos.Or))
+                {
+                    for(int i = 0; i < Cola.Count; i++) if(i % 2 != 0) if(Cola.ToList().ElementAt(i).TClasificacion != Tipos.Or) throw new Error("El OR no esta en orden",log,linea);
+                    // Remuevo los ors
+                    Cola.RemoveAll(x => x.TClasificacion == Tipos.Or);
+                    // Generacion de codigo, primer if
+                    lenguajecs.Write(IndentString() + "if (");
+                    if (Cola.First().TClasificacion == Tipos.ST)
+                    {
+                        lenguajecs.WriteLine("Contenido == \"" + Cola.First().TContenido + "\")");
+                        lenguajecs.WriteLine(IndentString() + "{");
+                        IndentCont++;
+                        lenguajecs.WriteLine(IndentString() + "match(\"" + Cola.First().TContenido + "\");");
+                    }
+                    else if (Cola.First().TClasificacion == Tipos.Tipo)
+                    {
+                        lenguajecs.WriteLine("Clasificacion == Tipos." + Cola.First().TContenido + ")");
+                        lenguajecs.WriteLine(IndentString() + "{");
+                        IndentCont++;
+                        lenguajecs.WriteLine(IndentString() + "match(Tipos." + Cola.First().TContenido + ");");
+                    }
+                    IndentCont--;
+                    lenguajecs.WriteLine(IndentString() + "}");
+                    // Los else if de en medio
+                    for(int i = 1; i < (Cola.Count - 1); i++)
+                    {
+                        lenguajecs.Write(IndentString() + "else if (");
+                        if (Cola.ElementAt(i).TClasificacion == Tipos.ST)
+                        {
+                            lenguajecs.WriteLine("Contenido == \"" + Cola.ElementAt(i).TContenido + "\")");
+                            lenguajecs.WriteLine(IndentString() + "{");
+                            IndentCont++;
+                            lenguajecs.WriteLine(IndentString() + "match(\"" + Cola.ElementAt(i).TContenido + "\");");
+                        }
+                        else if (Cola.ElementAt(i).TClasificacion == Tipos.Tipo)
+                        {
+                            lenguajecs.WriteLine("Clasificacion == Tipos." + Cola.ElementAt(i).TContenido + ")");
+                            lenguajecs.WriteLine(IndentString() + "{");
+                            IndentCont++;
+                            lenguajecs.WriteLine(IndentString() + "match(Tipos." + Cola.ElementAt(i).TContenido + ");");
                         }
                         IndentCont--;
                         lenguajecs.WriteLine(IndentString() + "}");
                     }
-                    else
+                    // Ultimo else
+                    lenguajecs.WriteLine(IndentString() + "else");
+                    lenguajecs.WriteLine(IndentString() + "{");
+                    IndentCont++;
+                    if (Cola.Last().TClasificacion == Tipos.SNT)
                     {
-                        foreach (TokensOpt v in Cola)
+                        lenguajecs.WriteLine(IndentString() + Cola.Last().TContenido + "();");
+                    }
+                    else if (Cola.Last().TClasificacion == Tipos.ST)
+                    {
+                        lenguajecs.WriteLine(IndentString() + "match(\"" + Cola.Last().TContenido + "\");");
+                    }
+                    else if (Cola.Last().TClasificacion == Tipos.Tipo)
+                    {
+                        lenguajecs.WriteLine(IndentString() + "match(Tipos." + Cola.Last().TContenido + ");");
+                    }
+                    IndentCont--;
+                    lenguajecs.WriteLine(IndentString() + "}");
+                }
+                else
+                {
+                    foreach (TokensOpt v in Cola)
+                    {
+                        if (v.TClasificacion == Tipos.SNT)
                         {
-                            if (v.TClasificacion == Tipos.SNT)
-                            {
-                                lenguajecs.WriteLine(IndentString() + v.TContenido + "();");
-                            }
-                            else if (v.TClasificacion == Tipos.ST)
-                            {
-                                lenguajecs.WriteLine(IndentString() + "match(\"" + v.TContenido + "\");");
-                            }
-                            else if (v.TClasificacion == Tipos.Tipo)
-                            {
-                                lenguajecs.WriteLine(IndentString() + "match(Tipos." + v.TContenido + ");");
-                            }
+                            lenguajecs.WriteLine(IndentString() + v.TContenido + "();");
+                        }
+                        else if (v.TClasificacion == Tipos.ST)
+                        {
+                            lenguajecs.WriteLine(IndentString() + "match(\"" + v.TContenido + "\");");
+                        }
+                        else if (v.TClasificacion == Tipos.Tipo)
+                        {
+                            lenguajecs.WriteLine(IndentString() + "match(Tipos." + v.TContenido + ");");
                         }
                     }
                 }
-            }
-            if (Clasificacion != Tipos.FinProduccion)
-            {
-                ConjuntoTokens();
             }
         }
         private struct TokensOpt
