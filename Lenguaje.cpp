@@ -28,26 +28,59 @@ namespace Cplusplus
 			match("<");
 			match(Tipos.Identificador);
 			match(">");
+			if (Contenido == "?")
+			{
+				if (Contenido == "este")
+				{
+					match("este");
+				}
+				else
+				{
+					match("oeste");
+				}
+				match("condicionado");
+			}
 			if (Contenido == "#")
 			{
-				match("diego");
-				match("#");
-				Desayuno();
-				if (				match("el");
-				match("pro");
+				match("esto");
+				if (Contenido == "&")
+				{
+					Hola();
+				}
 				match("es");
+				match("recursivo");
 				Si();
 			}
-			public void Main()
+		}
+		public void Main()
+		{
+			match("void");
+			match("main");
+			match("(");
+			match(")");
+			BloqueInstrucciones();
+		}
+		public void BloqueInstrucciones()
+		{
+			if (Contenido == "listaInstrucciones")
 			{
-				match("void");
-				match("main");
-				match("(");
-				match(")");
-				BloqueInstrucciones();
+				match("listaInstrucciones");
 			}
-			public void BloqueInstrucciones()
+			else
 			{
+				Instruccion();
 			}
 		}
+		public void ListaInstrucciones()
+		{
+			Instruccion();
+			if (Contenido == ".")
+			{
+				Instruccion();
+			}
+		}
+		public void Instruccion()
+		{
+		}
 	}
+}
