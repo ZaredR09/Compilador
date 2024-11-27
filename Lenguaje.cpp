@@ -28,21 +28,26 @@ namespace Cplusplus
 			match("<");
 			match(Tipos.Identificador);
 			match(">");
-			Librerias();
 			if (Contenido == "#")
+			{
+				match("diego");
+				match("#");
+				Desayuno();
+				if (				match("el");
+				match("pro");
+				match("es");
+				Si();
+			}
+			public void Main()
+			{
+				match("void");
+				match("main");
+				match("(");
+				match(")");
+				BloqueInstrucciones();
+			}
+			public void BloqueInstrucciones()
 			{
 			}
 		}
-		public void Main()
-		{
-			match("void");
-			match("main");
-			match("(");
-			match(")");
-			BloqueInstrucciones();
-		}
-		public void BloqueInstrucciones()
-		{
-		}
 	}
-}
