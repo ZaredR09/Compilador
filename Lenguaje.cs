@@ -24,7 +24,7 @@ namespace Compilador
     {
         // Tal vez necesite una pila para almacenar las opcionales y el or
         private int IndentCont;
-        protected bool PrimerProduccion;
+        protected bool PrimerProduccion = true;
         // Me guardo el primer token en la bolsa, sin importar que sea pero debe ser global para todos dentro de una produccion
         public Lenguaje()
         {
