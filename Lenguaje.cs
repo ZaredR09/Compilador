@@ -24,6 +24,7 @@ namespace Compilador
     {
         // Tal vez necesite una pila para almacenar las opcionales y el or
         private int IndentCont;
+        protected bool PrimerProduccion;
         // Me guardo el primer token en la bolsa, sin importar que sea pero debe ser global para todos dentro de una produccion
         public Lenguaje()
         {
@@ -83,10 +84,17 @@ namespace Compilador
         }
         private void Producciones()
         {
-            if (Clasificacion == Tipos.SNT)
+            if (Clasificacion == Tipos.SNT && PrimerProduccion == true)
             {
                 lenguajecs.WriteLine(IndentString() + "public void " + Contenido + "()");
                 lenguajecs.WriteLine(IndentString() + "{");
+                IndentCont++;
+                PrimerProduccion = false;
+            }
+            else if (Clasificacion == Tipos.SNT && PrimerProduccion == false)
+            {
+                lenguajecs.WriteLine(IndentString(IndentCont) + "private void " + Contenido + "()");
+                lenguajecs.WriteLine(IndentString(IndentCont) + "{");
                 IndentCont++;
             }
             match(Tipos.SNT);
